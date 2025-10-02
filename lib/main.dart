@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'controllers/alarm_controller.dart';
 import 'screens/home_screen.dart';
 import 'core/constants/app_constants.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Set system UI overlay style
+
+  await _requestPermissions();
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -16,14 +19,27 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  
-  // Set preferred orientations
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
+  Get.put(AlarmController());
+
   runApp(const AlarmClockApp());
+}
+
+Future<void> _requestPermissions() async {
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+  }
+
+  if (GetPlatform.isAndroid) {
+    if (await Permission.scheduleExactAlarm.isDenied) {
+      await Permission.scheduleExactAlarm.request();
+    }
+  }
 }
 
 class AlarmClockApp extends StatelessWidget {
@@ -45,7 +61,7 @@ class AlarmClockApp extends StatelessWidget {
         ),
         useMaterial3: true,
         fontFamily: 'System',
-        // AppBar Theme
+
         appBarTheme: AppBarTheme(
           backgroundColor: AppColors.background,
           elevation: 0,
@@ -53,7 +69,7 @@ class AlarmClockApp extends StatelessWidget {
           iconTheme: const IconThemeData(color: AppColors.textPrimary),
           titleTextStyle: AppTextStyles.headlineMedium,
         ),
-        // Card Theme
+
         cardTheme: CardThemeData(
           color: AppColors.cardBackground,
           elevation: 4,
@@ -61,14 +77,14 @@ class AlarmClockApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
-        // Dialog Theme
+
         dialogTheme: DialogThemeData(
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
         ),
-        // Bottom Sheet Theme
+
         bottomSheetTheme: BottomSheetThemeData(
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
@@ -77,7 +93,7 @@ class AlarmClockApp extends StatelessWidget {
             ),
           ),
         ),
-        // Snackbar Theme
+
         snackBarTheme: SnackBarThemeData(
           backgroundColor: AppColors.surface,
           contentTextStyle: AppTextStyles.bodyMedium,

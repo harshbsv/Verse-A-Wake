@@ -5,6 +5,12 @@ import '../models/alarm.dart';
 import '../controllers/alarm_controller.dart';
 import '../core/constants/app_constants.dart';
 
+class _Day {
+  final String name;
+  final int value;
+  const _Day({required this.name, required this.value});
+}
+
 class AddEditAlarmScreen extends StatelessWidget {
   final Alarm? alarm;
 
@@ -13,10 +19,9 @@ class AddEditAlarmScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<AlarmController>();
-    final labelController = TextEditingController(
-      text: alarm?.label ?? '',
-    );
-    
+
+    final labelController = TextEditingController(text: alarm?.label ?? '');
+
     final selectedHour = (alarm?.hour ?? TimeOfDay.now().hour).obs;
     final selectedMinute = (alarm?.minute ?? TimeOfDay.now().minute).obs;
     final selectedDays = (alarm?.repeatDays.toSet() ?? <int>{}).obs;
@@ -100,10 +105,7 @@ class AddEditAlarmScreen extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppColors.cardBackground,
-                AppColors.surface,
-              ],
+              colors: [AppColors.cardBackground, AppColors.surface],
             ),
             borderRadius: BorderRadius.circular(AppRadius.xxl),
             border: Border.all(
@@ -156,11 +158,7 @@ class AddEditAlarmScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 16,
-                      color: AppColors.primary,
-                    ),
+                    Icon(Icons.access_time, size: 16, color: AppColors.primary),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
                       AppStrings.tapToChangeTime,
@@ -186,7 +184,10 @@ class AddEditAlarmScreen extends StatelessWidget {
   ) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: selectedHour.value, minute: selectedMinute.value),
+      initialTime: TimeOfDay(
+        hour: selectedHour.value,
+        minute: selectedMinute.value,
+      ),
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
@@ -196,11 +197,10 @@ class AddEditAlarmScreen extends StatelessWidget {
               surface: AppColors.surface,
               onSurface: AppColors.textPrimary,
             ),
-            dialogTheme: DialogThemeData(
-              backgroundColor: AppColors.surface,
-            ),
+            dialogTheme: DialogThemeData(backgroundColor: AppColors.surface),
           ),
-          child: child!,
+
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );
@@ -216,10 +216,7 @@ class AddEditAlarmScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1.5,
-        ),
+        border: Border.all(color: AppColors.border, width: 1.5),
       ),
       child: TextField(
         controller: labelController,
@@ -235,10 +232,7 @@ class AddEditAlarmScreen extends StatelessWidget {
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(AppSpacing.lg),
-          prefixIcon: Icon(
-            Icons.label_outline,
-            color: AppColors.textTertiary,
-          ),
+          prefixIcon: Icon(Icons.label_outline, color: AppColors.textTertiary),
         ),
       ),
     );
@@ -246,13 +240,13 @@ class AddEditAlarmScreen extends StatelessWidget {
 
   Widget _buildRepeatDaysSection(RxSet<int> selectedDays) {
     const days = [
-      {'name': AppStrings.sunday, 'value': 0},
-      {'name': AppStrings.monday, 'value': 1},
-      {'name': AppStrings.tuesday, 'value': 2},
-      {'name': AppStrings.wednesday, 'value': 3},
-      {'name': AppStrings.thursday, 'value': 4},
-      {'name': AppStrings.friday, 'value': 5},
-      {'name': AppStrings.saturday, 'value': 6},
+      _Day(name: AppStrings.sunday, value: 0),
+      _Day(name: AppStrings.monday, value: 1),
+      _Day(name: AppStrings.tuesday, value: 2),
+      _Day(name: AppStrings.wednesday, value: 3),
+      _Day(name: AppStrings.thursday, value: 4),
+      _Day(name: AppStrings.friday, value: 5),
+      _Day(name: AppStrings.saturday, value: 6),
     ];
 
     return Column(
@@ -269,15 +263,14 @@ class AddEditAlarmScreen extends StatelessWidget {
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: days.map((day) {
-              final dayValue = day['value'] as int;
-              final isSelected = selectedDays.contains(dayValue);
+              final isSelected = selectedDays.contains(day.value);
 
               return GestureDetector(
                 onTap: () {
                   if (isSelected) {
-                    selectedDays.remove(dayValue);
+                    selectedDays.remove(day.value);
                   } else {
-                    selectedDays.add(dayValue);
+                    selectedDays.add(day.value);
                   }
                 },
                 child: AnimatedContainer(
@@ -291,9 +284,7 @@ class AddEditAlarmScreen extends StatelessWidget {
                         : AppColors.cardBackground,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(
-                      color: isSelected
-                          ? AppColors.primary
-                          : AppColors.border,
+                      color: isSelected ? AppColors.primary : AppColors.border,
                       width: 2,
                     ),
                     boxShadow: isSelected
@@ -308,13 +299,14 @@ class AddEditAlarmScreen extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      day['name'] as String,
+                      day.name,
                       style: AppTextStyles.labelSmall.copyWith(
                         color: isSelected
                             ? AppColors.textPrimary
                             : AppColors.textTertiary,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -341,12 +333,12 @@ class AddEditAlarmScreen extends StatelessWidget {
         onPressed: isLoading
             ? null
             : () => _saveAlarm(
-                  controller,
-                  labelController,
-                  selectedHour,
-                  selectedMinute,
-                  selectedDays,
-                ),
+                controller,
+                labelController,
+                selectedHour,
+                selectedMinute,
+                selectedDays,
+              ),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
@@ -384,24 +376,69 @@ class AddEditAlarmScreen extends StatelessWidget {
     RxInt selectedMinute,
     RxSet<int> selectedDays,
   ) async {
-    final newAlarm = Alarm(
-      id: alarm?.id ?? const Uuid().v4(),
-      hour: selectedHour.value,
-      minute: selectedMinute.value,
-      label: labelController.text.trim(),
-      isActive: true,
-      repeatDays: selectedDays.toList()..sort(),
-    );
-
-    bool success;
-    if (alarm != null) {
-      success = await controller.updateAlarm(newAlarm);
-    } else {
-      success = await controller.addAlarm(newAlarm);
+    if (selectedDays.isEmpty) {
+      Get.snackbar(
+        'Validation Error',
+        'Please select at least one day for the alarm to repeat.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orangeAccent,
+        colorText: Colors.white,
+      );
+      return;
     }
 
-    if (success) {
-      Get.back(result: true);
+    controller.isLoading.value = true;
+
+    try {
+      final newAlarm = Alarm(
+        id: alarm?.id ?? const Uuid().v4(),
+        hour: selectedHour.value,
+        minute: selectedMinute.value,
+        label: labelController.text.trim(),
+        isActive: true,
+        repeatDays: selectedDays.toList()..sort(),
+      );
+
+      bool success;
+
+      if (alarm != null) {
+        print('Attempting to UPDATE alarm with ID: ${newAlarm.id}');
+        success = await controller.updateAlarm(newAlarm);
+        print('Update operation returned: $success');
+      } else {
+        print('Attempting to ADD new alarm...');
+        success = await controller.addAlarm(newAlarm);
+        print('Add operation returned: $success');
+      }
+
+      if (success) {
+        print('Operation successful. Navigating back.');
+        Get.back(result: true);
+      } else {
+        print('Operation failed. Showing error snackbar.');
+        Get.snackbar(
+          'Operation Failed',
+          'The alarm could not be saved. Please try again.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e, stackTrace) {
+      print('----------- FATAL ERROR SAVING ALARM -----------');
+      print('Exception: $e');
+      print('Stack Trace: $stackTrace');
+      print('------------------------------------------');
+
+      Get.snackbar(
+        'An Unexpected Error Occurred',
+        'Failed to save the alarm due to a critical error.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+    } finally {
+      controller.isLoading.value = false;
     }
   }
 }

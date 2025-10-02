@@ -4,7 +4,7 @@ class Alarm {
   final int minute;
   final String label;
   final bool isActive;
-  final List<int> repeatDays; // 0 = Sunday, 1 = Monday, etc.
+  final List<int> repeatDays;
   final String ringtone;
 
   Alarm({
@@ -17,7 +17,6 @@ class Alarm {
     this.ringtone = 'default',
   });
 
-  // Convert Alarm to Map for storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -30,7 +29,6 @@ class Alarm {
     };
   }
 
-  // Create Alarm from Map
   factory Alarm.fromJson(Map<String, dynamic> json) {
     return Alarm(
       id: json['id'],
@@ -43,7 +41,6 @@ class Alarm {
     );
   }
 
-  // Create a copy of the alarm with updated fields
   Alarm copyWith({
     String? id,
     int? hour,
@@ -64,14 +61,12 @@ class Alarm {
     );
   }
 
-  // Format time as string (e.g., "09:30")
   String get timeString {
     final hourStr = hour.toString().padLeft(2, '0');
     final minuteStr = minute.toString().padLeft(2, '0');
     return '$hourStr:$minuteStr';
   }
 
-  // Get formatted time with AM/PM
   String get formattedTime {
     final period = hour >= 12 ? 'PM' : 'AM';
     final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
@@ -79,11 +74,10 @@ class Alarm {
     return '$displayHour:$minuteStr $period';
   }
 
-  // Get repeat days as string (e.g., "Mon, Wed, Fri")
   String get repeatDaysString {
     if (repeatDays.isEmpty) return 'Once';
     if (repeatDays.length == 7) return 'Every day';
-    
+
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final sortedDays = [...repeatDays]..sort();
     return sortedDays.map((day) => dayNames[day]).join(', ');

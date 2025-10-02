@@ -13,13 +13,14 @@ class NotificationService {
 
   bool _initialized = false;
 
-  // Initialize the notification service
   Future<void> initialize() async {
     if (_initialized) return;
 
     tz.initializeTimeZones();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -39,44 +40,22 @@ class NotificationService {
     _initialized = true;
   }
 
-  // Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
-    // Handle notification tap - you can navigate to a specific screen here
-    // Log or handle the notification tap event
+    print('Notification tapped with payload: ${response.payload}');
   }
 
-  // Schedule an alarm notification
   Future<void> scheduleAlarm(Alarm alarm) async {
     if (!alarm.isActive) return;
 
-    await _notifications.cancel(alarm.id.hashCode);
-
-    final now = DateTime.now();
-    var scheduledDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      alarm.hour,
-      alarm.minute,
-    );
-
-    // If the alarm time has passed today, schedule for tomorrow
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
-
-    final tz.TZDateTime scheduledTime = tz.TZDateTime.from(
-      scheduledDate,
-      tz.local,
-    );
-
     const androidDetails = AndroidNotificationDetails(
-      'alarm_channel',
+      'alarm_channel_id',
       'Alarms',
-      channelDescription: 'Alarm notifications',
+      channelDescription: 'Channel for alarm clock notifications',
       importance: Importance.max,
       priority: Priority.high,
-      sound: RawResourceAndroidNotificationSound('alarm_sound'),
+      sound: UriAndroidNotificationSound(
+        'content://settings/system/alarm_alert',
+      ),
       playSound: true,
       enableVibration: true,
       fullScreenIntent: true,
@@ -86,7 +65,8 @@ class NotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      sound: 'alarm_sound.aiff',
+
+      sound: 'default',
     );
 
     const notificationDetails = NotificationDetails(
@@ -95,77 +75,98 @@ class NotificationService {
     );
 
     if (alarm.repeatDays.isEmpty) {
-      // One-time alarm
-      await _notifications.zonedSchedule(
-        alarm.id.hashCode,
-        'Alarm',
-        alarm.label.isEmpty ? 'Time to wake up!' : alarm.label,
-        scheduledTime,
-        notificationDetails,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: alarm.id,
-      );
+      await _scheduleOneTimeAlarm(alarm, notificationDetails);
     } else {
-      // Recurring alarm - schedule for each selected day
-      for (final day in alarm.repeatDays) {
-        final daysUntilAlarm = (day - scheduledDate.weekday + 7) % 7;
-        var nextAlarmDate = scheduledDate.add(Duration(days: daysUntilAlarm));
-        
-        if (nextAlarmDate.isBefore(now)) {
-          nextAlarmDate = nextAlarmDate.add(const Duration(days: 7));
-        }
-
-        final tz.TZDateTime nextScheduledTime = tz.TZDateTime.from(
-          nextAlarmDate,
-          tz.local,
-        );
-
-        await _notifications.zonedSchedule(
-          alarm.id.hashCode + day,
-          'Alarm',
-          alarm.label.isEmpty ? 'Time to wake up!' : alarm.label,
-          nextScheduledTime,
-          notificationDetails,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          payload: alarm.id,
-        );
-      }
+      await _scheduleRecurringAlarm(alarm, notificationDetails);
     }
   }
 
-  // Cancel an alarm notification
+  Future<void> _scheduleOneTimeAlarm(
+    Alarm alarm,
+    NotificationDetails details,
+  ) async {
+    final tz.TZDateTime scheduledTime = _nextInstanceOfTime(
+      alarm.hour,
+      alarm.minute,
+    );
+
+    await _notifications.zonedSchedule(
+      alarm.id.hashCode,
+      'Alarm',
+      alarm.label.isEmpty ? 'Time to wake up!' : alarm.label,
+      scheduledTime,
+      details,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: alarm.id,
+    );
+  }
+
+  Future<void> _scheduleRecurringAlarm(
+    Alarm alarm,
+    NotificationDetails details,
+  ) async {
+    for (final day in alarm.repeatDays) {
+      final scheduledTime = _nextInstanceOfTime(
+        alarm.hour,
+        alarm.minute,
+        dayOfWeek: day,
+      );
+
+      final uniqueId = alarm.id.hashCode + day;
+
+      await _notifications.zonedSchedule(
+        uniqueId,
+        'Alarm',
+        alarm.label.isEmpty ? 'Time to wake up!' : alarm.label,
+        scheduledTime,
+        details,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: alarm.id,
+      );
+    }
+  }
+
+  tz.TZDateTime _nextInstanceOfTime(int hour, int minute, {int? dayOfWeek}) {
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+
+    if (dayOfWeek == null) {
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+    } else {
+      int daysToAdd = (dayOfWeek - scheduledDate.weekday + 7) % 7;
+      scheduledDate = scheduledDate.add(Duration(days: daysToAdd));
+
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 7));
+      }
+    }
+    return scheduledDate;
+  }
+
   Future<void> cancelAlarm(Alarm alarm) async {
     await _notifications.cancel(alarm.id.hashCode);
-    
-    // Cancel all recurring notifications for this alarm
+
     for (int day = 0; day < 7; day++) {
       await _notifications.cancel(alarm.id.hashCode + day);
     }
   }
 
-  // Cancel all alarms
   Future<void> cancelAllAlarms() async {
     await _notifications.cancelAll();
-  }
-
-  // Request notification permissions (mainly for iOS)
-  Future<bool> requestPermissions() async {
-    if (!_initialized) await initialize();
-
-    final result = await _notifications
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-
-    return result ?? true;
   }
 }

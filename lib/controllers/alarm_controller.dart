@@ -9,13 +9,8 @@ class AlarmController extends GetxController {
   final AlarmStorage _storage = AlarmStorage();
   final NotificationService _notificationService = NotificationService();
 
-  // Observable list of alarms
   final RxList<Alarm> alarms = <Alarm>[].obs;
-  
-  // Loading state
   final RxBool isLoading = false.obs;
-  
-  // Error state
   final RxString errorMessage = ''.obs;
 
   @override
@@ -24,144 +19,151 @@ class AlarmController extends GetxController {
     _initializeServices();
   }
 
-  /// Initialize services and load alarms
   Future<void> _initializeServices() async {
+    isLoading.value = true;
     try {
-      isLoading.value = true;
       await _notificationService.initialize();
-      await _notificationService.requestPermissions();
       await loadAlarms();
-    } catch (e) {
-      errorMessage.value = 'Failed to initialize: $e';
-      _showErrorSnackbar(AppStrings.errorOccurred);
+    } catch (e, s) {
+      print('Initialization failed: $e\n$s');
+      errorMessage.value = 'Failed to initialize services.';
+      _showErrorSnackbar('Initialization failed.');
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Load all alarms from storage
   Future<void> loadAlarms() async {
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
       final loadedAlarms = await _storage.loadAlarms();
-      alarms.value = loadedAlarms;
-    } catch (e) {
-      errorMessage.value = 'Failed to load alarms: $e';
-      _showErrorSnackbar(AppStrings.errorOccurred);
-    } finally {
-      isLoading.value = false;
+
+      alarms.assignAll(loadedAlarms);
+      sortAlarmsByTime();
+    } catch (e, s) {
+      print('Failed to load alarms: $e\n$s');
+      errorMessage.value = 'Could not load alarms from storage.';
     }
   }
 
-  /// Add a new alarm
   Future<bool> addAlarm(Alarm alarm) async {
+    isLoading.value = true;
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      
-      await _storage.addAlarm(alarm);
-      
+      alarms.add(alarm);
+      sortAlarmsByTime();
+
+      await _storage.saveAlarms(alarms.toList());
+
       if (alarm.isActive) {
         await _notificationService.scheduleAlarm(alarm);
       }
-      
-      await loadAlarms();
-      _showSuccessSnackbar(AppStrings.alarmAdded);
+
       return true;
-    } catch (e) {
-      errorMessage.value = 'Failed to add alarm: $e';
-      _showErrorSnackbar(AppStrings.errorOccurred);
+    } catch (e, s) {
+      print('Failed to add alarm: $e\n$s');
+
+      alarms.removeWhere((a) => a.id == alarm.id);
+      errorMessage.value = 'Failed to save alarm.';
       return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Update an existing alarm
   Future<bool> updateAlarm(Alarm alarm) async {
+    isLoading.value = true;
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      
-      await _storage.updateAlarm(alarm);
-      
-      // Cancel existing notifications and reschedule if active
-      await _notificationService.cancelAlarm(alarm);
-      if (alarm.isActive) {
-        await _notificationService.scheduleAlarm(alarm);
+      final index = alarms.indexWhere((a) => a.id == alarm.id);
+      if (index != -1) {
+        alarms[index] = alarm;
+        sortAlarmsByTime();
+
+        await _storage.saveAlarms(alarms.toList());
+
+        await _notificationService.cancelAlarm(alarm);
+        if (alarm.isActive) {
+          await _notificationService.scheduleAlarm(alarm);
+        }
+        return true;
       }
-      
-      await loadAlarms();
-      _showSuccessSnackbar(AppStrings.alarmUpdated);
-      return true;
-    } catch (e) {
-      errorMessage.value = 'Failed to update alarm: $e';
-      _showErrorSnackbar(AppStrings.errorOccurred);
+      return false;
+    } catch (e, s) {
+      print('Failed to update alarm: $e\n$s');
+      errorMessage.value = 'Failed to update alarm.';
+
       return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Delete an alarm
   Future<void> deleteAlarm(Alarm alarm) async {
+    isLoading.value = true;
     try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      
+      alarms.removeWhere((a) => a.id == alarm.id);
+
+      await _storage.saveAlarms(alarms.toList());
+
       await _notificationService.cancelAlarm(alarm);
-      await _storage.deleteAlarm(alarm.id);
-      await loadAlarms();
+
       _showSuccessSnackbar(AppStrings.alarmDeleted);
-    } catch (e) {
-      errorMessage.value = 'Failed to delete alarm: $e';
+    } catch (e, s) {
+      print('Failed to delete alarm: $e\n$s');
+
+      alarms.add(alarm);
+      sortAlarmsByTime();
       _showErrorSnackbar(AppStrings.errorOccurred);
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Toggle alarm active state
-  Future<void> toggleAlarm(Alarm alarm) async {
+  Future<void> clearAllAlarms() async {
+    isLoading.value = true;
     try {
-      final updatedAlarm = alarm.copyWith(isActive: !alarm.isActive);
-      
-      await _storage.updateAlarm(updatedAlarm);
-      
+      alarms.clear();
+
+      await _storage.saveAlarms([]);
+
+      await _notificationService.cancelAllAlarms();
+
+      _showSuccessSnackbar('All alarms cleared');
+    } catch (e, s) {
+      print('Failed to clear alarms: $e\n$s');
+
+      await loadAlarms();
+      _showErrorSnackbar(AppStrings.errorOccurred);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> toggleAlarm(Alarm alarm) async {
+    final index = alarms.indexWhere((a) => a.id == alarm.id);
+    if (index == -1) return;
+
+    final originalAlarm = alarms[index];
+    final updatedAlarm = originalAlarm.copyWith(
+      isActive: !originalAlarm.isActive,
+    );
+
+    alarms[index] = updatedAlarm;
+
+    try {
+      await _storage.saveAlarms(alarms.toList());
+
       if (updatedAlarm.isActive) {
         await _notificationService.scheduleAlarm(updatedAlarm);
       } else {
         await _notificationService.cancelAlarm(updatedAlarm);
       }
-      
-      await loadAlarms();
-    } catch (e) {
-      errorMessage.value = 'Failed to toggle alarm: $e';
+    } catch (e, s) {
+      print('Failed to toggle alarm: $e\n$s');
+
+      alarms[index] = originalAlarm;
       _showErrorSnackbar(AppStrings.errorOccurred);
     }
   }
 
-  /// Get alarm by ID
-  Alarm? getAlarmById(String id) {
-    try {
-      return alarms.firstWhere((alarm) => alarm.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Check if there are any active alarms
-  bool get hasActiveAlarms {
-    return alarms.any((alarm) => alarm.isActive);
-  }
-
-  /// Get count of active alarms
-  int get activeAlarmsCount {
-    return alarms.where((alarm) => alarm.isActive).length;
-  }
-
-  /// Sort alarms by time
   void sortAlarmsByTime() {
     alarms.sort((a, b) {
       final aTime = a.hour * 60 + a.minute;
@@ -170,66 +172,36 @@ class AlarmController extends GetxController {
     });
   }
 
-  /// Show success snackbar
+  Alarm? getAlarmById(String id) {
+    return alarms.firstWhereOrNull((alarm) => alarm.id == id);
+  }
+
+  bool get hasActiveAlarms => alarms.any((alarm) => alarm.isActive);
+  int get activeAlarmsCount => alarms.where((alarm) => alarm.isActive).length;
+
+  void _showBaseSnackbar(String title, String message, Color backgroundColor) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: backgroundColor,
+      colorText: AppColors.textPrimary,
+      margin: const EdgeInsets.all(AppSpacing.md),
+      borderRadius: AppRadius.md,
+      duration: const Duration(seconds: 2),
+      animationDuration: AppDurations.medium,
+    );
+  }
+
   void _showSuccessSnackbar(String message) {
-    Get.snackbar(
-      'Success',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.success,
-      colorText: AppColors.textPrimary,
-      margin: const EdgeInsets.all(AppSpacing.md),
-      borderRadius: AppRadius.md,
-      duration: const Duration(seconds: 2),
-      animationDuration: AppDurations.medium,
-    );
+    _showBaseSnackbar('Success', message, AppColors.success);
   }
 
-  /// Show error snackbar
   void _showErrorSnackbar(String message) {
-    Get.snackbar(
-      'Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.error,
-      colorText: AppColors.textPrimary,
-      margin: const EdgeInsets.all(AppSpacing.md),
-      borderRadius: AppRadius.md,
-      duration: const Duration(seconds: 3),
-      animationDuration: AppDurations.medium,
-    );
+    _showBaseSnackbar('Error', message, AppColors.error);
   }
 
-  /// Show info snackbar
   void showInfoSnackbar(String message) {
-    Get.snackbar(
-      'Info',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.info,
-      colorText: AppColors.textPrimary,
-      margin: const EdgeInsets.all(AppSpacing.md),
-      borderRadius: AppRadius.md,
-      duration: const Duration(seconds: 2),
-      animationDuration: AppDurations.medium,
-    );
-  }
-
-  /// Clear all alarms
-  Future<void> clearAllAlarms() async {
-    try {
-      isLoading.value = true;
-      errorMessage.value = '';
-      
-      await _notificationService.cancelAllAlarms();
-      await _storage.clearAllAlarms();
-      await loadAlarms();
-      _showSuccessSnackbar('All alarms cleared');
-    } catch (e) {
-      errorMessage.value = 'Failed to clear alarms: $e';
-      _showErrorSnackbar(AppStrings.errorOccurred);
-    } finally {
-      isLoading.value = false;
-    }
+    _showBaseSnackbar('Info', message, AppColors.info);
   }
 }
