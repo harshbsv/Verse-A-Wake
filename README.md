@@ -211,8 +211,8 @@ Thanks to all the amazing people who have contributed to this project!
 
 ## 📞 Contact & Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/alarm_clock_app/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/alarm_clock_app/discussions)
+- **Issues**: [GitHub Issues](https://github.com/harshbsv/alarm_clock_app/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/harshbsv/alarm_clock_app/discussions)
 
 ## 🌟 Show Your Support
 
