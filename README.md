@@ -211,7 +211,7 @@ Thanks to all the amazing people who have contributed to this project!
 
 ## 📞 Contact & Support
 
-- **Issues**: [GitHub Issues](https://github.com/harshbsv/Verse-A-Wake/issues))
+- **Issues**: [GitHub Issues](https://github.com/harshbsv/Verse-A-Wake/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/harshbsv/Verse-A-Wake/discussions)
 
 ## 🌟 Show Your Support
